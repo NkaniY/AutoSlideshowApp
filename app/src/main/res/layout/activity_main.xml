@@ -40,5 +40,12 @@
         android:layout_centerInParent="true"
         android:id="@+id/imageView"/>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/timer"
+        android:text="0.0"
+        android:layout_centerHorizontal="true"/>
+
 
 </RelativeLayout>

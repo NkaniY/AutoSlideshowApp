@@ -8,11 +8,21 @@ import android.os.Build
 import android.util.Log
 import android.provider.MediaStore
 import android.content.ContentUris
+import android.database.Cursor
+import android.view.View
 import kotlinx.android.synthetic.main.activity_main.*
+import android.os.Handler
+import java.util.*
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(),View.OnClickListener {
 
     private val PERMISSION_REQUEST_CODE = 100
+    private var cursor :Cursor? = null
+
+    private var mTimer: Timer? = null
+    private var mTimerSec = 0.0
+
+    private var mHandler = Handler()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,12 +31,20 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
                 getContentsInfo()
+                nextButton.setOnClickListener(this)
+                prevButton.setOnClickListener(this)
+                playButton.setOnClickListener(this)
             } else {
                 requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),PERMISSION_REQUEST_CODE)
             }
         } else {
             getContentsInfo()
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        cursor!!.close()
+        super.onDestroy()
     }
 
     override fun onRequestPermissionsResult(
@@ -42,23 +60,81 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onClick(v: View){
+        when(v.id){
+            R.id.nextButton -> {
+                nextImage()
+            }
+            R.id.prevButton -> {
+                prevImage()
+            }
+            R.id.playButton -> {
+                playSlideshow()
+            }
+        }
+    }
+
     private fun getContentsInfo() {
         val resolver = contentResolver
-        val cursor = resolver.query(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            null,
-            null,
-            null,
-            null
+        cursor = resolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, // データの種類
+            null, // 項目(null = 全項目)
+            null, // フィルタ条件(null = フィルタなし)
+            null, // フィルタ用パラメータ
+            null // ソート (null ソートなし)
         )
-
         if (cursor!!.moveToFirst()) {
-            val fieldIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID)
-            val id = cursor.getLong(fieldIndex)
-            val imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-
-            imageView.setImageURI(imageUri)
+            setimageview()
         }
-        cursor.close()
+    }
+
+    private fun nextImage(){
+        if (!cursor!!.moveToNext()) {
+            cursor!!.moveToFirst()
+        }
+        setimageview()
+
+    }
+
+    private fun prevImage(){
+        if (!cursor!!.moveToPrevious()) {
+            cursor!!.moveToLast()
+        }
+        setimageview()
+    }
+
+    private fun playSlideshow(){
+        if (mTimer == null) {
+            mTimer = Timer()
+
+            mTimer!!.schedule(object : TimerTask() {
+                override fun run() {
+                    mTimerSec += 0.1
+                    mHandler.post {
+                        if((mTimerSec * 10).toInt() % 20 == 0){
+                            nextImage()
+                        }
+                        timer.text = String.format("%.1f", mTimerSec)
+                    }
+                }
+            }, 100, 100)
+            playButton.text = "停止"
+            nextButton.isClickable = false
+            prevButton.isClickable = false
+        }else{
+            mTimer!!.cancel()
+            mTimer = null
+            playButton.text = "再生"
+            nextButton.isClickable = true
+            prevButton.isClickable = true
+        }
+    }
+
+    private fun setimageview() {
+        val fieldIndex = cursor!!.getColumnIndex(MediaStore.Images.Media._ID)
+        val id = cursor!!.getLong(fieldIndex)
+        val imageUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+
+        imageView.setImageURI(imageUri)
     }
 }
